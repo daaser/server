@@ -22,7 +22,7 @@ func MakeHandler(ss Service) http.Handler {
 
 	r := mux.NewRouter()
 
-	r.Methods("GET").Path("/fib/{n}").Handler(fibHandler)
+	r.Path("/fib/{n}").Handler(fibHandler).Methods("GET")
 
 	return r
 }

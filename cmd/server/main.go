@@ -11,9 +11,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/daaser/server/fib"
-	"github.com/daaser/server/header"
-	"github.com/daaser/server/str"
+	"github.com/daaser/server/internal/fib"
+	"github.com/daaser/server/internal/header"
+	"github.com/daaser/server/internal/ip"
+	"github.com/daaser/server/internal/str"
 	kitprometheus "github.com/go-kit/kit/metrics/prometheus"
 	"github.com/gorilla/mux"
 	"github.com/heptiolabs/healthcheck"
@@ -37,6 +38,7 @@ func main() {
 			5*time.Second,
 			"Time in seconds to wait before forcefully terminating the server.",
 		)
+		http2 = flag.Bool("http2", false, "Use HTTP/2")
 	)
 
 	flag.Parse()
@@ -109,12 +111,35 @@ func main() {
 		)
 	}
 
+	var is ip.Service
+	{
+		is = ip.NewService()
+		is = ip.LoggingMiddleware(*logger)(is)
+		is = ip.NewInstrumentingMiddleware(
+			kitprometheus.NewCounterFrom(stdprometheus.CounterOpts{
+				Namespace: "api",
+				Subsystem: "ip",
+				Name:      "request_count",
+				Help:      "Number of requests received.",
+			}, fieldKeys),
+			kitprometheus.NewSummaryFrom(stdprometheus.SummaryOpts{
+				Namespace: "api",
+				Subsystem: "ip",
+				Name:      "request_latency_microseconds",
+				Help:      "Total duration of requests in microseconds.",
+			}, fieldKeys),
+			is,
+		)
+	}
+
 	r := mux.NewRouter()
 
 	// our main API routes
+	// the methods for these are defined in their respective handlers
 	r.PathPrefix("/string").Handler(str.MakeHandler(ss))
 	r.PathPrefix("/fib").Handler(fib.MakeHandler(fs))
-	r.Handle("/headers", header.MakeHandler(hs))
+	r.Path("/headers").Handler(header.MakeHandler(hs))
+	r.Path("/ip").Handler(ip.MakeHandler(is))
 
 	// expose the Promethus metrics we registered above
 	r.Handle("/metrics", promhttp.Handler())
@@ -126,8 +151,8 @@ func main() {
 		"check-tcp",
 		healthcheck.TCPDialCheck(*httpAddr, 50*time.Millisecond),
 	)
-	r.HandleFunc("/live", health.LiveEndpoint)
-	r.HandleFunc("/ready", health.ReadyEndpoint)
+	r.Path("/live").HandlerFunc(health.LiveEndpoint).Methods("GET")
+	r.Path("/ready").HandlerFunc(health.ReadyEndpoint).Methods("GET")
 
 	// register some access control middleware
 	r.Use(accessControl)
@@ -150,16 +175,24 @@ func main() {
 
 	errs := make(chan error)
 	go func() {
-		logger.Info(
-			"server",
-			zap.String("transport", "HTTP"),
-			zap.String("addr", *httpAddr),
-		)
-		errs <- srv.ListenAndServe()
-		// errs <- srv.ListenAndServeTLS(
-		// 	"./config/cert.pem",
-		// 	"./config/key.pem",
-		// )
+		if *http2 {
+			logger.Info(
+				"server",
+				zap.String("transport", "HTTPS"),
+				zap.String("addr", *httpAddr),
+			)
+			errs <- srv.ListenAndServeTLS(
+				"./config/cert.pem",
+				"./config/key.pem",
+			)
+		} else {
+			logger.Info(
+				"server",
+				zap.String("transport", "HTTP"),
+				zap.String("addr", *httpAddr),
+			)
+			errs <- srv.ListenAndServe()
+		}
 	}()
 
 	go func() {
@@ -205,27 +238,18 @@ func walkRoute(r *mux.Router) error {
 		router *mux.Router,
 		ancestors []*mux.Route,
 	) error {
-		pathTemplate, err := route.GetPathTemplate()
-		if err == nil {
-			fmt.Println("ROUTE:", pathTemplate)
-		}
-		pathRegexp, err := route.GetPathRegexp()
-		if err == nil {
-			fmt.Println("Path regexp:", pathRegexp)
-		}
-		// queriesTemplates, err := route.GetQueriesTemplates()
-		// if err == nil {
-		// 	fmt.Println("Queries templates:", strings.Join(queriesTemplates, ","))
-		// }
-		// queriesRegexps, err := route.GetQueriesRegexp()
-		// if err == nil {
-		// 	fmt.Println("Queries regexps:", strings.Join(queriesRegexps, ","))
-		// }
 		methods, err := route.GetMethods()
 		if err == nil {
-			fmt.Println("Methods:", strings.Join(methods, ","))
+			pathTemplate, err := route.GetPathTemplate()
+			if err == nil {
+				fmt.Println("ROUTE:", pathTemplate)
+			}
+			pathRegexp, err := route.GetPathRegexp()
+			if err == nil {
+				fmt.Println("Path regexp:", pathRegexp)
+			}
+			fmt.Println("Methods:", strings.Join(methods, ","), "\n")
 		}
-		fmt.Println()
 		return nil
 	})
 }

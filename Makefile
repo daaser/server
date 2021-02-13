@@ -3,7 +3,7 @@
 all: build
 
 build:
-	go build -o ./build/app
+	go build -o ./build/app ./cmd/server
 
 binrun: build
 	./build/app

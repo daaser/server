@@ -24,8 +24,8 @@ func MakeHandler(ss Service) http.Handler {
 
 	r := mux.NewRouter()
 
-	r.Methods("POST").Path("/string/uppercase").Handler(uppercaseHandler)
-	r.Methods("POST").Path("/string/count").Handler(countHandler)
+	r.Path("/string/uppercase").Handler(uppercaseHandler).Methods("POST")
+	r.Path("/string/count").Handler(countHandler).Methods("POST")
 
 	return r
 }
