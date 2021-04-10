@@ -45,7 +45,7 @@ type instrumentingMiddleware struct {
 
 func (mw loggingMiddleware) GetIp() (output []byte, err error) {
 	defer func(begin time.Time) {
-		mw.logger.Info(
+		mw.logger.Debug(
 			"service",
 			zap.String("method", "GetIp"),
 			zap.Duration("took", time.Since(begin)),

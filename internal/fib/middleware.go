@@ -45,7 +45,7 @@ type instrumentingMiddleware struct {
 
 func (mw loggingMiddleware) Fib(n uint64) (b *big.Int) {
 	defer func(begin time.Time) {
-		mw.logger.Info(
+		mw.logger.Debug(
 			"service",
 			zap.String("method", "Fib"),
 			zap.Uint64("input", n),

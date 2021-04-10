@@ -45,7 +45,7 @@ type instrumentingMiddleware struct {
 
 func (mw loggingMiddleware) Headers(req *http.Request) (b []byte) {
 	defer func(begin time.Time) {
-		mw.logger.Info(
+		mw.logger.Debug(
 			"service",
 			zap.String("method", "Headers"),
 			zap.Duration("took", time.Since(begin)),

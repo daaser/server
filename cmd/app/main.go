@@ -14,6 +14,7 @@ import (
 	"github.com/daaser/server/internal/fib"
 	"github.com/daaser/server/internal/header"
 	"github.com/daaser/server/internal/ip"
+	"github.com/daaser/server/internal/log"
 	"github.com/daaser/server/internal/str"
 	kitprometheus "github.com/go-kit/kit/metrics/prometheus"
 	"github.com/gorilla/mux"
@@ -23,9 +24,7 @@ import (
 	"go.uber.org/zap"
 )
 
-const (
-	defaultPort = "8080"
-)
+const defaultPort = "8080"
 
 // seq 1 20 | xargs -n1 -P8 bash -c 'i=$0; url="http://localhost:8080/fib/$i"; curl --silent $url'
 func main() {
@@ -39,11 +38,15 @@ func main() {
 			"Time in seconds to wait before forcefully terminating the server.",
 		)
 		http2 = flag.Bool("http2", false, "Use HTTP/2")
+		debug = flag.Bool("debug", false, "Debug logging")
 	)
 
 	flag.Parse()
 
-	logger, _ := zap.NewProduction()
+	logger, err := log.NewLogger(*debug)
+	if err != nil {
+		panic(err)
+	}
 	defer logger.Sync()
 
 	fieldKeys := []string{"method", "error"}
@@ -157,13 +160,16 @@ func main() {
 	// register some access control middleware
 	r.Use(accessControl)
 
-	err := walkRoute(r)
+	err = walkRoute(r)
 	if err != nil {
 		logger.Error("walkRoute", zap.Error(err))
 		os.Exit(1)
 	}
 
-	stdOutLogger, _ := zap.NewStdLogAt(logger, zap.ErrorLevel)
+	stdOutLogger, err := zap.NewStdLogAt(logger, zap.ErrorLevel)
+	if err != nil {
+		panic(err)
+	}
 	srv := &http.Server{
 		Addr:           *httpAddr,
 		Handler:        r,

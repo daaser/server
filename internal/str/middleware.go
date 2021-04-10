@@ -45,7 +45,7 @@ type instrumentingMiddleware struct {
 
 func (mw loggingMiddleware) Uppercase(s string) (output string, err error) {
 	defer func(begin time.Time) {
-		mw.logger.Info(
+		mw.logger.Debug(
 			"service",
 			zap.String("method", "Uppercase"),
 			zap.String("input", s),
