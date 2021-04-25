@@ -1,6 +1,6 @@
 module github.com/daaser/server
 
-go 1.14
+go 1.16
 
 require (
 	github.com/go-kit/kit v0.10.0

@@ -162,8 +162,7 @@ func main() {
 
 	err = walkRoute(r)
 	if err != nil {
-		logger.Error("walkRoute", zap.Error(err))
-		os.Exit(1)
+		logger.Fatal("walkRoute", zap.Error(err))
 	}
 
 	stdOutLogger, err := zap.NewStdLogAt(logger, zap.ErrorLevel)
@@ -171,15 +170,17 @@ func main() {
 		panic(err)
 	}
 	srv := &http.Server{
-		Addr:           *httpAddr,
-		Handler:        r,
-		ErrorLog:       stdOutLogger,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
-		MaxHeaderBytes: 1 << 20,
+		Addr:              *httpAddr,
+		Handler:           r,
+		ErrorLog:          stdOutLogger,
+		ReadTimeout:       10 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
+		WriteTimeout:      10 * time.Second,
+		IdleTimeout:       10 * time.Second,
+		MaxHeaderBytes:    1 << 20,
 	}
 
-	errs := make(chan error)
+	errs := make(chan error, 1)
 	go func() {
 		if *http2 {
 			logger.Info(

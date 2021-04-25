@@ -12,8 +12,8 @@ run:
 	go run main.go
 
 fmt:
-	go fmt ./...
 	go mod tidy
+	go fmt ./...
 
 clean:
 	rm ./build/*
